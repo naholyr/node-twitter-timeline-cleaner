@@ -39,10 +39,16 @@ module.exports = (new Command)
   // Security
   .command('keys')
     .description('Update app\'s credentials to use your own (browse https://dev.twitter.com/apps/new to create it)')
-    .usage('--key <…> --secret <…> [options]')
+    .usage('<options>')
+    .option('--reset-access', 'Reset your access token (always enabled if key/secret is provided)')
     .option('--key <consumer_key>', 'Consumer key')
     .option('--secret <consumer_secret>', 'Consumer secret')
     .option('--no-store', 'Do not update user configuration')
     .option('--no-check', 'Do not check credentials')
     .action(require('./cli/keys'))
+    .parent
+  // Test connection
+  .command('test')
+    .description('Test connection to Twitter')
+    .action(require('./cli/test'))
     .parent
