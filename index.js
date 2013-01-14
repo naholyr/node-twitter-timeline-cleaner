@@ -3,14 +3,19 @@ var Command = require('commander').Command;
 
 var package = require('./package.json');
 var config = require('./lib/config');
+var cache = require('./lib/cache');
 
 
 module.exports = (new Command)
   .version(package.version)
   .description('Twitter Timeline Cleaner')
-  .option('-c, --config <file>', 'Custom configuration file', config.file)
+  .option('--config <file>', 'Custom configuration file', config.file)
+  .option('--no-cache', 'Disable cache')
   .on('config', function (file) {
     config.file = file;
+  })
+  .on('cache', function (enabled) {
+    cache.enabled = !!enabled;
   })
   .usage('[ttc_options] <command> [command_options]')
   // Help
