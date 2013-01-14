@@ -1,6 +1,7 @@
 
 var twitter = require('../lib/twitter');
 var ProgressBar = require('progress');
+var Table = require('cli-table');
 var cache = require('../lib/cache');
 
 module.exports = function () {
@@ -220,9 +221,9 @@ module.exports = function () {
       ], function (i) {
         switch (i) {
           case 0: global_stats(); break;
-          case 1: wip(); break;
-          case 2: wip(); break;
-          case 3: wip(); break;
+          case 1: top_posters(); break;
+          case 2: inactive_posters(); break;
+          case 3: top_interactions(); break;
           case 4: quit(); break;
         }
         loop();
@@ -243,9 +244,49 @@ module.exports = function () {
         Math.round(timelapse/3600));
     }
 
-    function wip () {
+    function top_posters () {
       console.error();
-      console.error('Not Implemented Yet');
+      console.error('Here are the 20% top posters of your timeline:');
+      console.error('If you want to read less, you should start here.');
+      console.error();
+
+      var table = new Table({
+        head: ['#', 'id', '@screen_name', 'nb posts']
+      });
+      var i = 1;
+      posters.slice(0, Math.ceil(posters.length/5)).filter(function (p) {
+        return p.nbPosts > 0;
+      }).forEach(function (p) {
+        table.push([String(i++), p.id, '@' + p.screen_name, p.nbPosts]);
+      });
+      console.error(table.toString());
+    }
+
+    function inactive_posters () {
+      console.error();
+      console.error('Here are your "friends" who did not post anything recently');
+      console.error('There may be inactive users in the list, if you want to clean');
+      console.error('up your friends list, that may be a good start.');
+      console.error();
+
+      var table = new Table({
+        head: ['#', 'id', '@screen_name', 'nb posts']
+      });
+      var i = 1;
+      posters.filter(function (p) {
+        return p.nbPosts == 0;
+      }).forEach(function (p) {
+        table.push([String(i++), p.id, '@' + p.screen_name, p.nbPosts]);
+      });
+      console.error(table.toString());
+    }
+
+    function top_interactions () {
+      console.error();
+      console.error('Not implemented yet, sorry :(');
+      console.error('Next version will check who you mention or are mentionned by');
+      console.error('and who sent/received direct messages, to detect your real');
+      console.error('acquaintance in that mess. That should help a lot!');
     }
 
     function quit () {
