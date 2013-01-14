@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+
+var program = require('..');
+
+if (!program.parse(process.argv).args.length) {
+  program.outputHelp();
+  process.exit(1);
+}

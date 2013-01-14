@@ -1,12 +1,21 @@
 {
-  "name": "TwitterCleanup",
+  "name": "twitter-timeline-cleaner",
   "version": "0.0.1-wip",
   "description": "CLI tool to help manage you cleanup your Twitter timeline with useful tools and stats",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/_mocha"
+    "test": "./node_modules/.bin/_mocha",
+    "ttc": "./bin/ttc"
   },
   "repository": "",
   "author": "Nicolas Chambrier <naholyr@gmail.com>",
-  "license": "BSD"
+  "license": "BSD",
+  "dependencies": {
+    "chai": "~1.4.2",
+    "mocha": "~1.8.1",
+    "progress": "~0.1.0",
+    "commander": "~1.1.1",
+    "cli-color": "~0.2.1",
+    "twitter": "~0.1.18"
+  }
 }
