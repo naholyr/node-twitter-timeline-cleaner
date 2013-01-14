@@ -3,6 +3,7 @@ var twitter = require('../lib/twitter');
 var ProgressBar = require('progress');
 var Table = require('cli-table');
 var cache = require('../lib/cache');
+var color = require('../lib/color');
 
 module.exports = function () {
   var command = arguments[arguments.length - 1];
@@ -40,16 +41,16 @@ module.exports = function () {
       console.error(err);
       process.exit(1);
     }
-    console.error('@%s (#%s) following %d account(s)', me.screen_name, me.id, me.friends_count);
+    console.error(color.success('@%s (#%s) following %d account(s)'), me.screen_name, me.id, me.friends_count);
+    console.error();
     console.error('  I will now read your timeline and your direct messages, and then be able');
     console.error('  to tell you who you could remove to improve your productivity :)');
     if (cache.enabled) {
       console.error('  Note: timeline posts will be cached locally');
       console.error('        for privacy reasons direct messages are not cached');
-      console.error('        unless you provided option "--cache-dms"')
+      console.error('        ' + color.bold('unless you provided option "--cache-dms"'));
     }
     console.error();
-    process.stdout.write('');
 
     start(this, me);
   });
@@ -94,6 +95,7 @@ module.exports = function () {
           progress.tick(ids.length);
           if (res.length == 0) {
             progress.tick(progress.total);
+            console.error();
             cb(null, friends);
           } else {
             next();
@@ -183,7 +185,7 @@ module.exports = function () {
     if (!command.offline) {
       console.error('Note: at this point, all data (except direct messages unless you');
       console.error('      provided options "--cache-dms") is cached.');
-      console.error('      You can run "stats --offline" to return directly to this screen');
+      console.error('      You can run "' + color.bold('stats --offline') + '" to return directly to this screen');
       console.error();
     }
     console.error('Analyzing data…');
@@ -211,14 +213,17 @@ module.exports = function () {
 
     (function loop () {
       console.error();
-      console.error('What do you want to do with your data?');
+      console.error();
+      console.error(color.title('What do you want to do with your data?'));
       command.choose([
-        'Global statistics',
-        'Who is filling my timeline?',
-        'Who is inactive?',
-        'Who do I really care?',
-        'Quit'
+        color.bold('Global statistics'),
+        color.bold('Who is filling my timeline?'),
+        color.bold('Who is inactive?'),
+        color.bold('Who do I really care?'),
+        color.warning.bold('Quit')
       ], function (i) {
+        console.error();
+        console.error();
         switch (i) {
           case 0: global_stats(); break;
           case 1: top_posters(); break;
@@ -232,7 +237,7 @@ module.exports = function () {
 
     function global_stats () {
       console.error();
-      console.error('Global statistics:');
+      console.error(color.title('Global statistics') + ':');
       console.error();
       console.error('  You receive ~ %d messages daily, do you feel overwhelmed?',
         Math.round((24 * posts.length) / (timelapse / 3600)));
@@ -246,7 +251,8 @@ module.exports = function () {
 
     function top_posters () {
       console.error();
-      console.error('Here are the 20% top posters of your timeline:');
+      console.error(color.title('Here are the 20% top posters of your timeline') + ':');
+      console.error();
       console.error('If you want to read less, you should start here.');
       console.error();
 
@@ -264,7 +270,8 @@ module.exports = function () {
 
     function inactive_posters () {
       console.error();
-      console.error('Here are your "friends" who did not post anything recently');
+      console.error(color.title('Here are your "friends" who did not post anything recently') + ':');
+      console.error();
       console.error('There may be inactive users in the list, if you want to clean');
       console.error('up your friends list, that may be a good start.');
       console.error();
@@ -283,7 +290,8 @@ module.exports = function () {
 
     function top_interactions () {
       console.error();
-      console.error('Not implemented yet, sorry :(');
+      console.error(color.warning.bold('Not implemented yet, sorry :('));
+      console.error();
       console.error('Next version will check who you mention or are mentionned by');
       console.error('and who sent/received direct messages, to detect your real');
       console.error('acquaintance in that mess. That should help a lot!');
@@ -291,7 +299,7 @@ module.exports = function () {
 
     function quit () {
       console.error();
-      console.error('Good bye!');
+      console.error(color.success('Good bye!'));
       process.exit(0);
     }
   }
