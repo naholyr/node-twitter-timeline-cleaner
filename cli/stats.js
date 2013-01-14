@@ -6,6 +6,32 @@ var cache = require('../lib/cache');
 module.exports = function () {
   var command = arguments[arguments.length - 1];
 
+  if (command.offline) {
+    var posts = cache.get('timeline');
+    var messages = cache.get('dms');
+    var friends = (function () {
+      var ids = cache.get('friends_ids');
+      var user_info = cache.get('user_info');
+      try {
+        return ids.reduce(function (friends, id) {
+          if (!user_info[id]) throw new Error('Missing user info');
+          friends[id] = user_info[id];
+          return friends;
+        }, {});
+      } catch (e) {
+        return null;
+      }
+    })();
+
+    if (!posts || !messages || !friends) {
+      console.error('Not enough data to work offline, please run "stats --cache-dms" at least once');
+      process.exit(1);
+    }
+
+    analyze(friends, messages, posts);
+    return;
+  }
+
   console.error('Connecting to Twitter…');
   console.error();
   twitter(function (err, me) {
@@ -48,13 +74,49 @@ module.exports = function () {
       total: 1
     });
     progress.tick(0);
+    var user_info = cache.get('user_info', {});
     t.getFriendsIds(me.id, function (res) {
-      progress.tick(1);
-      console.error();
-      var err = (res instanceof Error) ? res : null;
-      var list = err ? null : res;
-      if (!err) cache.set('friends', list);
-      cb(err, list);
+      if (res instanceof Error) {
+        console.error();
+        return cb(res);
+      }
+      cache.set('friends_ids', res, true);
+      progress.total = res.length;
+      progress.tick(0);
+      var friends = {};
+      (function next () {
+        var ids = res.splice(0, 50);
+        var done = function () {
+          ids.forEach(function (id) {
+            friends[id] = user_info[id];
+          });
+          progress.tick(ids.length);
+          if (res.length == 0) {
+            progress.tick(progress.total);
+            cb(null, friends);
+          } else {
+            next();
+          }
+        }
+        var req_ids = ids.filter(function (id) {
+          return !user_info[id];
+        });
+        if (req_ids.length) {
+          t.post('/users/lookup.json', {user_id:req_ids.map(String).join(',')}, function (res) {
+            if (res instanceof Error) {
+              console.error();
+              return cb(res);
+            }
+            res.forEach(function (user) {
+              user_info[user.id_str] = user;
+            });
+            cache.set('user_info', user_info, true);
+            done();
+          });
+        } else {
+          done();
+        }
+      })();
     });
   }
 
@@ -117,23 +179,80 @@ module.exports = function () {
 
   function analyze (friends, messages, posts) {
     console.error();
+    if (!command.offline) {
+      console.error('Note: at this point, all data (except direct messages unless you');
+      console.error('      provided options "--cache-dms") is cached.');
+      console.error('      You can run "stats --offline" to return directly to this screen');
+      console.error();
+    }
     console.error('Analyzing data…');
 
-    console.error('  Detect who is filling your timeline: ');
-    var posters = friends.map(function (id) {
+    // Timelapse
+    var end = new Date(posts[0].created_at).getTime();
+    var start = new Date(posts[posts.length - 1].created_at).getTime();
+    var timelapse = (end - start) / 1000;
+
+    // The posters
+    var posters = Object.keys(friends).map(function (id) {
+      var nb = posts.filter(function (post) {
+        return post.user.id == id;
+      }).length;
       return {
         id: id,
-        nbPosts: posts.filter(function (post) {
-          return post.user.id == id;
-        }).length
+        screen_name: friends[id].screen_name,
+        nbPosts: nb,
+        hourly: 3600 * nb / timelapse
       };
     });
     posters.sort(function (p1, p2) {
       return p2.nbPosts - p1.nbPosts;
     });
-    console.error(posters);
 
-    console.error('TODO analyze');
+    (function loop () {
+      console.error();
+      console.error('What do you want to do with your data?');
+      command.choose([
+        'Global statistics',
+        'Who is filling my timeline?',
+        'Who is inactive?',
+        'Who do I really care?',
+        'Quit'
+      ], function (i) {
+        switch (i) {
+          case 0: global_stats(); break;
+          case 1: wip(); break;
+          case 2: wip(); break;
+          case 3: wip(); break;
+          case 4: quit(); break;
+        }
+        loop();
+      });
+    })();
+
+    function global_stats () {
+      console.error();
+      console.error('Global statistics:');
+      console.error();
+      console.error('  You receive ~ %d messages daily, do you feel overwhelmed?',
+        Math.round((24 * posts.length) / (timelapse / 3600)));
+      console.error('  The 20% top posters in your timeline produce %d%% of total',
+        Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nbPosts }, 0) / posts.length));
+      console.error('  Amongst your %d friends, %d%% did not post any message during the last %d hours.',
+        posters.length,
+        Math.round(100 * posters.filter(function (p) { return p.nbPosts == 0 }).length / posters.length),
+        Math.round(timelapse/3600));
+    }
+
+    function wip () {
+      console.error();
+      console.error('Not Implemented Yet');
+    }
+
+    function quit () {
+      console.error();
+      console.error('Good bye!');
+      process.exit(0);
+    }
   }
 }
 
