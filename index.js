@@ -27,6 +27,7 @@ module.exports = (new Command)
   // Stats
   .command('stats')
     .description('Show statistics about your timeline')
+    .option('--cache-dms', 'Cache direct messages')
     .action(require('./cli/stats'))
     .parent
   // Check status
