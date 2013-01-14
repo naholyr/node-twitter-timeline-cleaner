@@ -24,6 +24,11 @@ module.exports = (new Command)
     .description('Show statistics about your timeline')
     .action(require('./cli/stats'))
     .parent
+  // Check status
+  .command('status')
+    .description('Show app\'s status (i.e. rate limit)')
+    .action(require('./cli/status'))
+    .parent
   // Security
   .command('keys')
     .description('Update app\'s credentials to use your own (browse https://dev.twitter.com/apps/new to create it)')
