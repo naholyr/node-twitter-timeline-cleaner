@@ -1,0 +1,12 @@
+{
+  "name": "TwitterCleanup",
+  "version": "0.0.1-wip",
+  "description": "CLI tool to help manage you cleanup your Twitter timeline with useful tools and stats",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/_mocha"
+  },
+  "repository": "",
+  "author": "Nicolas Chambrier <naholyr@gmail.com>",
+  "license": "BSD"
+}
