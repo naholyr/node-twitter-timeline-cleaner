@@ -1,5 +1,6 @@
 
 var Command = require('commander').Command;
+var color = require('../lib/color');
 
 module.exports = function (name, command) {
   if (arguments.length !== 2) {
@@ -10,12 +11,13 @@ module.exports = function (name, command) {
   })[0];
   if (!task) {
     console.error();
-    console.error('  Command "%s", unknown', name);
+    console.error(color.error('  Command "%s", unknown'), name);
     console.error();
     console.error('  Note: Run "%s" with no option to list existing commands', command.parent._name);
     command.help();
   }
   console.error();
-  console.error('  %s', task.description());
+  console.error(color.title('  %s %s') + ':', task.parent._name, task._name)
+  console.error(color.bold('    %s'), task.description());
   task.help();
 }
