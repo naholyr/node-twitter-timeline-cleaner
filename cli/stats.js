@@ -263,7 +263,7 @@ module.exports = function () {
     var mentions_start = new Date(mentions[mentions.length - 1].created_at).getTime();
     var mentions_timelapse = (mentions_end - mentions_start) / 1000;
 
-    // The posters
+    // Users statistics
     var posters = Object.keys(friends).map(function (id) {
       var nb = home_posts.filter(function (post) {
         return post.user.id == id;
@@ -271,8 +271,15 @@ module.exports = function () {
       return {
         id: id,
         screen_name: friends[id].screen_name,
-        nbPosts: nb,
-        hourly: 3600 * nb / home_timelapse
+        nb_posts: nb,
+        mention_to_me: mentions.reduce(function (total, m) {
+          if (m.user && m.user.id == id) total++;
+          return total;
+        }, 0),
+        mention_by_me: user_posts.reduce(function (total, p) {
+          if (p.mentions && p.mentions[id]) total++;
+          return total;
+        }, 0)
       };
     });
     posters.sort(function (p1, p2) {
