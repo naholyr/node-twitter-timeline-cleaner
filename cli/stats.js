@@ -153,7 +153,21 @@ module.exports = function () {
       id:               post.id_str || post.id,
       text:             post.text,
       reply_status_id:  post.in_reply_to_status_id_str || post.in_reply_to_status_id,
-      reply_user_id:    post.in_reply_to_user_id_str || post.in_reply_to_user_id
+      reply_user_id:    post.in_reply_to_user_id_str || post.in_reply_to_user_id,
+      mentions:         (function (user_mentions) {
+        if (!user_mentions || !user_mentions.length) {
+          return null;
+        }
+        var res = {};
+        user_mentions.forEach(function (u) {
+          res[u.id_str || u.id] = {
+            id: u.id_str || u.id,
+            screen_name: u.screen_name,
+            name: u.name
+          };
+        });
+        return res;
+      })(post.entities && post.entities.user_mentions)
     };
   }
 
@@ -169,7 +183,7 @@ module.exports = function () {
     var posts = cache.get(cache_key, []);
 
     var next = function () {
-      var options = {count: count, include_entities: true};
+      var options = {count: count, include_entities: 1};
       if (posts.length > 0) {
         options.max_id = posts[posts.length - 1].id_str;
       }
