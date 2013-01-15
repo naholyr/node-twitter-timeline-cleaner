@@ -187,23 +187,31 @@ module.exports = function () {
     });
     progress.tick(0);
 
-    var posts = cache.get(cache_key, []);
+    var posts = [];
+    var old_posts = cache.get(cache_key, []);
+    var since_id = old_posts.length ? old_posts[0].id : null;
+    var max_id = null;
 
     var next = function () {
       var options = {count: count, include_entities: 1};
-      if (posts.length > 0) {
-        options.max_id = posts[posts.length - 1].id_str;
+      if (max_id) {
+        options.max_id = max_id;
+      }
+      if (since_id) {
+        options.since_id = since_id;
       }
       get_stream(options, function (res) {
         if (res instanceof Error) {
           console.error();
           return cb(res);
         }
-        if (posts.length > 0) res = res.slice(0, -1);
-        if (res.length == 0 || res[0].id_str == options.max_id) {
+        // First result = max_id
+        if (max_id) res.splice(0, 1);
+        if (res.length == 0) {
           // Done
           progress.finish();
         } else {
+          max_id = res[res.length - 1].id;
           // Save and go on
           posts.forEach(function (p) {
             if (p.entities && p.entities.user_mentions) {
@@ -211,13 +219,14 @@ module.exports = function () {
             }
           });
           posts = posts.concat(res.map(post_data.bind(this, me)));
-          if (cache_key) cache.set(cache_key, posts);
           progress.tick(res.length);
         }
         // Next step
         process.nextTick(function () {
           if (progress.complete) {
             progress.finish();
+            posts = posts.concat(old_posts);
+            if (cache_key) cache.set(cache_key, posts);
             console.error();
             cb(null, posts);
           } else {
@@ -233,20 +242,20 @@ module.exports = function () {
 
   function extract_direct_messages (t, me, cb) {
     var cache_key = command.cacheDms ? 'direct_messages' : null;
-    extract_stream(me, t.getDirectMessages.bind(t), 'Direct Messages', 50, 200, cache_key, cb);
+    extract_stream(me, t.getDirectMessages.bind(t), 'Direct Messages', 50, 500, cache_key, cb);
   }
 
   function extract_direct_messages_sent (t, me, cb) {
     var cache_key = command.cacheDms ? 'direct_messages_sent' : null;
-    extract_stream(me, t.getDirectMessagesSent.bind(t), 'Direct Messages Sent', 50, 200, cache_key, cb);
+    extract_stream(me, t.getDirectMessagesSent.bind(t), 'Direct Messages Sent', 50, 500, cache_key, cb);
   }
 
   function extract_home_timeline (t, me, cb) {
-    extract_stream(me, t.getHomeTimeline.bind(t), 'Home Timeline', 100, 800, 'home_timeline', cb);
+    extract_stream(me, t.getHomeTimeline.bind(t), 'Home Timeline', 100, 1000, 'home_timeline', cb);
   }
 
   function extract_user_timeline (t, me, cb) {
-    extract_stream(me, t.getUserTimeline.bind(t), 'User Timeline', 100, 800, 'user_timeline', cb);
+    extract_stream(me, t.getUserTimeline.bind(t), 'User Timeline', 100, 1000, 'user_timeline', cb);
   }
 
   function extract_mentions (t, me, cb) {
