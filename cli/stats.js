@@ -158,7 +158,6 @@ module.exports = function () {
       created_at:       post.created_at,
       user:             user ? user_data(user) : null,
       id:               post.id_str || post.id,
-      text:             post.text,
       reply_status_id:  post.in_reply_to_status_id_str || post.in_reply_to_status_id,
       reply_user_id:    post.in_reply_to_user_id_str || post.in_reply_to_user_id,
       mentions:         (function (user_mentions) {
