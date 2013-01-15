@@ -18,6 +18,7 @@ module.exports = function () {
     var home_posts = cache.get('home_timeline');
     var user_posts = cache.get('user_timeline');
     var messages = cache.get('direct_messages');
+    var mentions = cache.get('mentions');
     var friends = (function () {
       var ids = cache.get('friends_ids');
       var user_info = cache.get('user_info');
@@ -32,7 +33,7 @@ module.exports = function () {
       }
     })();
 
-    if (!home_posts || !user_posts || !friends) {
+    if (!home_posts || !user_posts || !friends || !mentions) {
       console.error('Not enough data to work offline, please run "stats" at least once');
       process.exit(1);
     }
@@ -41,7 +42,7 @@ module.exports = function () {
       console.error(color.warning('No direct messages data: stats will ignore DMs (run "stats --cache-dms" to cache DMs)'));
     }
 
-    analyze(friends, messages, home_posts, user_posts);
+    analyze(friends, messages, home_posts, user_posts, mentions);
     return;
   }
 
@@ -71,10 +72,11 @@ module.exports = function () {
       extract_friends_list.bind(this, t, me),
       extract_direct_messages.bind(this, t, me),
       extract_home_timeline.bind(this, t, me),
-      extract_user_timeline.bind(this, t, me)
+      extract_user_timeline.bind(this, t, me),
+      extract_mentions.bind(this, t, me)
     ], function (err, results) {
       if (err) throw err;
-      analyze(results[0], results[1], results[2], results[3]);
+      analyze(results[0], results[1], results[2], results[3], results[4]);
     });
   }
 
@@ -146,6 +148,7 @@ module.exports = function () {
   function post_data (post) {
     var user = post.user || post.sender;
     return {
+      created_at:       post.created_at,
       user:             user ? user_data(user) : null,
       id:               post.id_str || post.id,
       text:             post.text,
@@ -221,7 +224,11 @@ module.exports = function () {
     extract_stream(t.getUserTimeline.bind(t), 'User Timeline', 100, 800, 'user_timeline', cb);
   }
 
-  function analyze (friends, messages, home_posts, user_posts) {
+  function extract_mentions (t, me, cb) {
+    extract_stream(t.getMentions.bind(t), 'Mentions', 100, 800, 'mentions', cb);
+  }
+
+  function analyze (friends, messages, home_posts, user_posts, mentions) {
     console.error();
     if (!command.offline) {
       console.error('Note: at this point, all data (except direct messages unless you');
@@ -238,6 +245,9 @@ module.exports = function () {
     var user_end = new Date(user_posts[0].created_at).getTime();
     var user_start = new Date(user_posts[user_posts.length - 1].created_at).getTime();
     var user_timelapse = (user_end - user_start) / 1000;
+    var mentions_end = new Date(mentions[0].created_at).getTime();
+    var mentions_start = new Date(mentions[mentions.length - 1].created_at).getTime();
+    var mentions_timelapse = (mentions_end - mentions_start) / 1000;
 
     // The posters
     var posters = Object.keys(friends).map(function (id) {
@@ -287,6 +297,8 @@ module.exports = function () {
         Math.round((24 * home_posts.length) / (home_timelapse / 3600)));
       console.error('  You post ~ %d messages daily',
         Math.round((24 * user_posts.length) / (user_timelapse / 3600)));
+      console.error('  You receive ~ %d mentions daily',
+        Math.round((24 * mentions.length) / (mentions_timelapse / 3600)));
       console.error('  The 20% top posters in your timeline produce %d%% of total',
         Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nbPosts }, 0) / home_posts.length));
       console.error('  Amongst your %d friends, %d%% did not post any message during the last %d hours.',
