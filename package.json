@@ -9,7 +9,7 @@
   "bin": {
     "ttc": "./bin/ttc"
   },
-  "repository": "",
+  "repository": "https://github.com/naholyr/node-twitter-timeline-cleaner.git",
   "author": "Nicolas Chambrier <naholyr@gmail.com>",
   "license": "BSD",
   "dependencies": {
