@@ -51,3 +51,11 @@ module.exports = (new Command)
     .description('Test connection to Twitter')
     .action(require('./cli/test'))
     .parent
+  // Cache management
+  .command('cache')
+    .description('Manage your local cache')
+    .option('--no-info', 'Skip information table')
+    .option('--reset', 'Reset local cache')
+    .option('--remove <key>', 'Reset local cache')
+    .action(require('./cli/cache'))
+    .parent
