@@ -19,6 +19,7 @@
     "commander": "~1.1.1",
     "cli-color": "~0.2.1",
     "twitter": "~0.1.18",
-    "cli-table": "~0.2.0"
+    "cli-table": "~0.2.0",
+    "async": "~0.1.22"
   }
 }

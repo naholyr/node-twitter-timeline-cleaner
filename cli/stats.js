@@ -4,13 +4,20 @@ var ProgressBar = require('progress');
 var Table = require('cli-table');
 var cache = require('../lib/cache');
 var color = require('../lib/color');
+var async = require('async');
+
+ProgressBar.prototype.finish = function () {
+  this.tick(this.total - this.curr); // update display
+  this.tick(this.total); // force complete
+};
 
 module.exports = function () {
   var command = arguments[arguments.length - 1];
 
   if (command.offline) {
-    var posts = cache.get('timeline');
-    var messages = cache.get('dms');
+    var home_posts = cache.get('home_timeline');
+    var user_posts = cache.get('user_timeline');
+    var messages = cache.get('direct_messages');
     var friends = (function () {
       var ids = cache.get('friends_ids');
       var user_info = cache.get('user_info');
@@ -25,12 +32,16 @@ module.exports = function () {
       }
     })();
 
-    if (!posts || !messages || !friends) {
-      console.error('Not enough data to work offline, please run "stats --cache-dms" at least once');
+    if (!home_posts || !user_posts || !friends) {
+      console.error('Not enough data to work offline, please run "stats" at least once');
       process.exit(1);
     }
 
-    analyze(friends, messages, posts);
+    if (!messages) {
+      console.error(color.warning('No direct messages data: stats will ignore DMs (run "stats --cache-dms" to cache DMs)'));
+    }
+
+    analyze(friends, messages, home_posts, user_posts);
     return;
   }
 
@@ -56,15 +67,14 @@ module.exports = function () {
   });
 
   function start (t, me) {
-    extract_friends_list(t, me, function (err, friends) {
+    async.series([
+      extract_friends_list.bind(this, t, me),
+      extract_direct_messages.bind(this, t, me),
+      extract_home_timeline.bind(this, t, me),
+      extract_user_timeline.bind(this, t, me)
+    ], function (err, results) {
       if (err) throw err;
-      extract_direct_messages(t, me, function (err, messages) {
-        if (err) throw err;
-        extract_timeline(t, me, function (err, posts) {
-          if (err) throw err;
-          analyze(friends, messages, posts);
-        });
-      });
+      analyze(results[0], results[1], results[2], results[3]);
     });
   }
 
@@ -94,7 +104,7 @@ module.exports = function () {
           });
           progress.tick(ids.length);
           if (res.length == 0) {
-            progress.tick(progress.total);
+            progress.finish();
             console.error();
             cb(null, friends);
           } else {
@@ -111,7 +121,7 @@ module.exports = function () {
               return cb(res);
             }
             res.forEach(function (user) {
-              user_info[user.id_str] = user;
+              user_info[user.id_str] = user_data(user);
             });
             cache.set('user_info', user_info);
             done();
@@ -121,6 +131,27 @@ module.exports = function () {
         }
       })();
     });
+  }
+
+  function user_data (user) {
+    return {
+      id:           user.id_str || user.id,
+      url:          user.url,
+      screen_name:  user.screen_name,
+      name:         user.name,
+      following:    user.following
+    };
+  }
+
+  function post_data (post) {
+    var user = post.user || post.sender;
+    return {
+      user:             user ? user_data(user) : null,
+      id:               post.id_str || post.id,
+      text:             post.text,
+      reply_status_id:  post.in_reply_to_status_id_str || post.in_reply_to_status_id,
+      reply_user_id:    post.in_reply_to_user_id_str || post.in_reply_to_user_id
+    };
   }
 
   function extract_stream (get_stream, label, count, total, cache_key, cb) {
@@ -135,29 +166,35 @@ module.exports = function () {
     var posts = cache.get(cache_key, []);
 
     var next = function () {
-      var options = {count: count};
+      var options = {count: count, include_entities: true};
       if (posts.length > 0) {
         options.max_id = posts[posts.length - 1].id_str;
       }
       get_stream(options, function (res) {
         if (res instanceof Error) {
           console.error();
-          return cb(err);
+          return cb(res);
         }
         if (posts.length > 0) res = res.slice(0, -1);
         if (res.length == 0 || res[0].id_str == options.max_id) {
           // Done
-          progress.tick(progress.total);
+          progress.finish();
         } else {
           // Save and go on
-          posts = posts.concat(res);
+          posts.forEach(function (p) {
+            if (p.entities && p.entities.user_mentions) {
+              console.error(p);
+              process.exit(3);
+            }
+          });
+          posts = posts.concat(res.map(post_data));
           if (cache_key) cache.set(cache_key, posts);
           progress.tick(res.length);
         }
         // Next step
         process.nextTick(function () {
           if (progress.complete) {
-            progress.tick(progress.total);
+            progress.finish();
             console.error();
             cb(null, posts);
           } else {
@@ -172,15 +209,19 @@ module.exports = function () {
   }
 
   function extract_direct_messages (t, me, cb) {
-    var cache_key = command.cacheDms ? 'dms' : null;
+    var cache_key = command.cacheDms ? 'direct_messages' : null;
     extract_stream(t.getDirectMessages.bind(t), 'Direct Messages', 50, 200, cache_key, cb);
   }
 
-  function extract_timeline (t, me, cb) {
-    extract_stream(t.getHomeTimeline.bind(t), 'Home Timeline', 100, 1000, 'timeline', cb);
+  function extract_home_timeline (t, me, cb) {
+    extract_stream(t.getHomeTimeline.bind(t), 'Home Timeline', 100, 800, 'home_timeline', cb);
   }
 
-  function analyze (friends, messages, posts) {
+  function extract_user_timeline (t, me, cb) {
+    extract_stream(t.getUserTimeline.bind(t), 'User Timeline', 100, 800, 'user_timeline', cb);
+  }
+
+  function analyze (friends, messages, home_posts, user_posts) {
     console.error();
     if (!command.offline) {
       console.error('Note: at this point, all data (except direct messages unless you');
@@ -190,21 +231,24 @@ module.exports = function () {
     }
     console.error('Analyzing data…');
 
-    // Timelapse
-    var end = new Date(posts[0].created_at).getTime();
-    var start = new Date(posts[posts.length - 1].created_at).getTime();
-    var timelapse = (end - start) / 1000;
+    // Time lapses
+    var home_end = new Date(home_posts[0].created_at).getTime();
+    var home_start = new Date(home_posts[home_posts.length - 1].created_at).getTime();
+    var home_timelapse = (home_end - home_start) / 1000;
+    var user_end = new Date(user_posts[0].created_at).getTime();
+    var user_start = new Date(user_posts[user_posts.length - 1].created_at).getTime();
+    var user_timelapse = (user_end - user_start) / 1000;
 
     // The posters
     var posters = Object.keys(friends).map(function (id) {
-      var nb = posts.filter(function (post) {
+      var nb = home_posts.filter(function (post) {
         return post.user.id == id;
       }).length;
       return {
         id: id,
         screen_name: friends[id].screen_name,
         nbPosts: nb,
-        hourly: 3600 * nb / timelapse
+        hourly: 3600 * nb / home_timelapse
       };
     });
     posters.sort(function (p1, p2) {
@@ -240,13 +284,15 @@ module.exports = function () {
       console.error(color.title('Global statistics') + ':');
       console.error();
       console.error('  You receive ~ %d messages daily, do you feel overwhelmed?',
-        Math.round((24 * posts.length) / (timelapse / 3600)));
+        Math.round((24 * home_posts.length) / (home_timelapse / 3600)));
+      console.error('  You post ~ %d messages daily',
+        Math.round((24 * user_posts.length) / (user_timelapse / 3600)));
       console.error('  The 20% top posters in your timeline produce %d%% of total',
-        Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nbPosts }, 0) / posts.length));
+        Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nbPosts }, 0) / home_posts.length));
       console.error('  Amongst your %d friends, %d%% did not post any message during the last %d hours.',
         posters.length,
         Math.round(100 * posters.filter(function (p) { return p.nbPosts == 0 }).length / posters.length),
-        Math.round(timelapse/3600));
+        Math.round(home_timelapse/3600));
     }
 
     function top_posters () {
