@@ -17,7 +17,8 @@ module.exports = function () {
   if (command.offline) {
     var home_posts = cache.get('home_timeline');
     var user_posts = cache.get('user_timeline');
-    var messages = cache.get('direct_messages');
+    var messages = cache.get('direct_messages', []);
+    var messages_sent = cache.get('direct_messages_sent', []);
     var mentions = cache.get('mentions');
     var friends = (function () {
       var ids = cache.get('friends_ids');
@@ -42,7 +43,7 @@ module.exports = function () {
       console.error(color.warning('No direct messages data: stats will ignore DMs (run "stats --cache-dms" to cache DMs)'));
     }
 
-    analyze(friends, messages, home_posts, user_posts, mentions);
+    analyze(friends, messages, messages_sent, home_posts, user_posts, mentions);
     return;
   }
 
@@ -71,12 +72,13 @@ module.exports = function () {
     async.series([
       extract_friends_list.bind(this, t, me),
       extract_direct_messages.bind(this, t, me),
+      extract_direct_messages_sent.bind(this, t, me),
       extract_home_timeline.bind(this, t, me),
       extract_user_timeline.bind(this, t, me),
       extract_mentions.bind(this, t, me)
     ], function (err, results) {
       if (err) throw err;
-      analyze(results[0], results[1], results[2], results[3], results[4]);
+      analyze(results[0], results[1], results[2], results[3], results[4], results[5]);
     });
   }
 
@@ -145,8 +147,13 @@ module.exports = function () {
     };
   }
 
-  function post_data (post) {
-    var user = post.user || post.sender;
+  function post_data (me, post) {
+    var user = post.user;
+    if (!user && post.sender && post.sender.id != me.id) {
+      user = post.sender;
+    } else if (!user && post.recipient && post.recipient.id != me.id) {
+      user = post.recipient;
+    }
     return {
       created_at:       post.created_at,
       user:             user ? user_data(user) : null,
@@ -171,7 +178,7 @@ module.exports = function () {
     };
   }
 
-  function extract_stream (get_stream, label, count, total, cache_key, cb) {
+  function extract_stream (me, get_stream, label, count, total, cache_key, cb) {
     var progress = new ProgressBar('Extracting ' + rpad(label, 20) + '  [:bar] :percent', {
       complete: "⋅",
       incomplete: " ",
@@ -200,11 +207,10 @@ module.exports = function () {
           // Save and go on
           posts.forEach(function (p) {
             if (p.entities && p.entities.user_mentions) {
-              console.error(p);
               process.exit(3);
             }
           });
-          posts = posts.concat(res.map(post_data));
+          posts = posts.concat(res.map(post_data.bind(this, me)));
           if (cache_key) cache.set(cache_key, posts);
           progress.tick(res.length);
         }
@@ -227,22 +233,27 @@ module.exports = function () {
 
   function extract_direct_messages (t, me, cb) {
     var cache_key = command.cacheDms ? 'direct_messages' : null;
-    extract_stream(t.getDirectMessages.bind(t), 'Direct Messages', 50, 200, cache_key, cb);
+    extract_stream(me, t.getDirectMessages.bind(t), 'Direct Messages', 50, 200, cache_key, cb);
+  }
+
+  function extract_direct_messages_sent (t, me, cb) {
+    var cache_key = command.cacheDms ? 'direct_messages_sent' : null;
+    extract_stream(me, t.getDirectMessagesSent.bind(t), 'Direct Messages Sent', 50, 200, cache_key, cb);
   }
 
   function extract_home_timeline (t, me, cb) {
-    extract_stream(t.getHomeTimeline.bind(t), 'Home Timeline', 100, 800, 'home_timeline', cb);
+    extract_stream(me, t.getHomeTimeline.bind(t), 'Home Timeline', 100, 800, 'home_timeline', cb);
   }
 
   function extract_user_timeline (t, me, cb) {
-    extract_stream(t.getUserTimeline.bind(t), 'User Timeline', 100, 800, 'user_timeline', cb);
+    extract_stream(me, t.getUserTimeline.bind(t), 'User Timeline', 100, 800, 'user_timeline', cb);
   }
 
   function extract_mentions (t, me, cb) {
-    extract_stream(t.getMentions.bind(t), 'Mentions', 100, 800, 'mentions', cb);
+    extract_stream(me, t.getMentions.bind(t), 'Mentions', 100, 800, 'mentions', cb);
   }
 
-  function analyze (friends, messages, home_posts, user_posts, mentions) {
+  function analyze (friends, messages, messages_sent, home_posts, user_posts, mentions) {
     console.error();
     if (!command.offline) {
       console.error('Note: at this point, all data (except direct messages unless you');
@@ -279,11 +290,19 @@ module.exports = function () {
         mention_by_me: user_posts.reduce(function (total, p) {
           if (p.mentions && p.mentions[id]) total++;
           return total;
-        }, 0)
+        }, 0),
+        dm_to_me: messages.reduce(function (total, m) {
+          if (m.user && m.user.id == id) total++;
+          return total;
+        }),
+        dm_by_me: messages_sent.reduce(function (total, m) {
+          if (m.user && m.user.id == id) total++;
+          return total;
+        })
       };
     });
     posters.sort(function (p1, p2) {
-      return p2.nbPosts - p1.nbPosts;
+      return p2.nb_posts - p1.nb_posts;
     });
 
     (function loop () {
@@ -321,10 +340,10 @@ module.exports = function () {
       console.error('  You receive ~ %d mentions daily',
         Math.round((24 * mentions.length) / (mentions_timelapse / 3600)));
       console.error('  The 20% top posters in your timeline produce %d%% of total',
-        Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nbPosts }, 0) / home_posts.length));
+        Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nb_posts }, 0) / home_posts.length));
       console.error('  Amongst your %d friends, %d%% did not post any message during the last %d hours.',
         posters.length,
-        Math.round(100 * posters.filter(function (p) { return p.nbPosts == 0 }).length / posters.length),
+        Math.round(100 * posters.filter(function (p) { return p.nb_posts == 0 }).length / posters.length),
         Math.round(home_timelapse/3600));
     }
 
@@ -340,9 +359,9 @@ module.exports = function () {
       });
       var i = 1;
       posters.slice(0, Math.ceil(posters.length/5)).filter(function (p) {
-        return p.nbPosts > 0;
+        return p.nb_posts > 0;
       }).forEach(function (p) {
-        table.push([String(i++), p.id, '@' + p.screen_name, p.nbPosts]);
+        table.push([String(i++), p.id, '@' + p.screen_name, p.nb_posts]);
       });
       console.error(table.toString());
     }
@@ -360,9 +379,9 @@ module.exports = function () {
       });
       var i = 1;
       posters.filter(function (p) {
-        return p.nbPosts == 0;
+        return p.nb_posts == 0;
       }).forEach(function (p) {
-        table.push([String(i++), p.id, '@' + p.screen_name, p.nbPosts]);
+        table.push([String(i++), p.id, '@' + p.screen_name, p.nb_posts]);
       });
       console.error(table.toString());
     }
