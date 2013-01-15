@@ -1,6 +1,6 @@
 {
   "name": "twitter-timeline-cleaner",
-  "version": "0.0.1-wip",
+  "version": "0.1.0",
   "description": "CLI tool to help manage you cleanup your Twitter timeline with useful tools and stats",
   "main": "index.js",
   "scripts": {
