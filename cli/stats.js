@@ -86,7 +86,7 @@ module.exports = function () {
     var progress = new ProgressBar('Extracting ' + rpad('Friends List', 20) + '  [:bar] :percent', {
       complete: "⋅",
       incomplete: " ",
-      width: 40,
+      width: 20,
       total: 1
     });
     progress.tick(0);
@@ -109,6 +109,8 @@ module.exports = function () {
           progress.tick(ids.length);
           if (res.length == 0) {
             progress.finish();
+            console.error();
+            console.error('  Total %d friend(s)', Object.keys(friends).length);
             console.error();
             cb(null, friends);
           } else {
@@ -181,7 +183,7 @@ module.exports = function () {
     var progress = new ProgressBar('Extracting ' + rpad(label, 20) + '  [:bar] :percent', {
       complete: "⋅",
       incomplete: " ",
-      width: 40,
+      width: 20,
       total: total
     });
     progress.tick(0);
@@ -226,6 +228,8 @@ module.exports = function () {
             progress.finish();
             posts = posts.concat(old_posts);
             if (cache_key) cache.set(cache_key, posts);
+            console.error();
+            console.error('  Fetched %d new post(s), Total %d post(s)', posts.length - old_posts.length, posts.length);
             console.error();
             cb(null, posts);
           } else {
