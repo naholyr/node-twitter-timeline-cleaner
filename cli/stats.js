@@ -294,16 +294,21 @@ module.exports = function () {
         dm_to_me: messages.reduce(function (total, m) {
           if (m.user && m.user.id == id) total++;
           return total;
-        }),
+        }, 0),
         dm_by_me: messages_sent.reduce(function (total, m) {
           if (m.user && m.user.id == id) total++;
           return total;
-        })
+        }, 0)
       };
     });
     posters.sort(function (p1, p2) {
       return p2.nb_posts - p1.nb_posts;
     });
+
+    console.error();
+    console.error(color.success('  Ready!'));
+    console.error(color.error('  Remember that this data is only a fraction of your real activity'));
+    console.error('  For example, data is based on only %d messages from your timeline', home_posts.length);
 
     (function loop () {
       console.error();
@@ -311,19 +316,21 @@ module.exports = function () {
       console.error(color.title('What do you want to do with your data?'));
       command.choose([
         color.bold('Global statistics'),
-        color.bold('Who is filling my timeline?'),
+        color.bold('Let me tell you who you should unfollow!'),
+        color.bold('Who is filling your timeline?'),
         color.bold('Who is inactive?'),
-        color.bold('Who do I really care?'),
+        color.bold('Who do you really care?'),
         color.warning.bold('Quit')
       ], function (i) {
         console.error();
         console.error();
         switch (i) {
           case 0: global_stats(); break;
-          case 1: top_posters(); break;
-          case 2: inactive_posters(); break;
-          case 3: top_interactions(); break;
-          case 4: quit(); break;
+          case 1: smart_guess(); break;
+          case 2: top_posters(); break;
+          case 3: inactive_posters(); break;
+          case 4: top_interactions(); break;
+          case 5: quit(); break;
         }
         loop();
       });
@@ -355,13 +362,20 @@ module.exports = function () {
       console.error();
 
       var table = new Table({
-        head: ['#', 'id', '@screen_name', 'nb posts']
+        head: ['#', 'id', '@screen_name', 'nb posts', 'mentions', 'DMs']
       });
       var i = 1;
       posters.slice(0, Math.ceil(posters.length/5)).filter(function (p) {
         return p.nb_posts > 0;
       }).forEach(function (p) {
-        table.push([String(i++), p.id, '@' + p.screen_name, p.nb_posts]);
+        table.push([
+          String(i++),
+          String(p.id),
+          '@' + p.screen_name,
+          p.nb_posts,
+          String(p.mention_by_me) + '↑ ' + String(p.mention_to_me) + '↓',
+          String(p.dm_by_me) + '↑ ' + String(p.dm_to_me) + '↓'
+        ]);
       });
       console.error(table.toString());
     }
@@ -375,24 +389,78 @@ module.exports = function () {
       console.error();
 
       var table = new Table({
-        head: ['#', 'id', '@screen_name', 'nb posts']
+        head: ['#', 'id', '@screen_name']
       });
       var i = 1;
       posters.filter(function (p) {
-        return p.nb_posts == 0;
+        return p.nb_posts == 0 && p.dm_by_me == 0 && p.dm_to_me == 0 && p.mention_by_me == 0 && p.mention_to_me == 0;
       }).forEach(function (p) {
-        table.push([String(i++), p.id, '@' + p.screen_name, p.nb_posts]);
+        table.push([String(i++), String(p.id), '@' + p.screen_name]);
       });
       console.error(table.toString());
     }
 
     function top_interactions () {
       console.error();
+      console.error(color.title('Here are the users you interact with the most') + ':');
+      console.error();
+      console.error('  You should already know them, and probably don\'t want to unfollow them');
+      console.error();
+
+      var table = new Table({
+        head: ['#', 'id', '@screen_name', 'nb posts', 'mentions', 'DMs', 'score (*)']
+      });
+      var i = 1;
+      posters
+        .slice() // clone
+        .filter(function has_interaction (u) {
+          return u.dm_to_me > 0 || u.dm_by_me > 0 || u.mention_to_me > 0 || u.mention_by_me > 0;
+        })
+        .map(function add_score (u) {
+          var score = 0;
+          // Mentions (to me = 1, from me = 2)
+          score += 1 * u.mention_to_me;
+          score += 2 * u.mention_by_me;
+          // DMs (to me = 3, from me = 5)
+          score += 3 * u.dm_to_me;
+          score += 5 * u.dm_by_me;
+          u.score = score;
+          return u;
+        })
+        .sort(function cmp_score (u1, u2) {
+          return u2.score - u1.score;
+        })
+        .forEach(function (u) {
+          table.push([
+            String(i++),
+            String(u.id),
+            '@' + u.screen_name,
+            u.nb_posts,
+            String(u.mention_by_me) + '↑ ' + String(u.mention_to_me) + '↓',
+            String(u.dm_by_me) + '↑ ' + String(u.dm_to_me) + '↓',
+            String(u.score)
+          ]);
+      });
+
+      i--;
+      console.error(color.bold('  You had direct interaction with %d/%d (') + color.success('%d%%') + color.bold(') of your friends'), i, posters.length, Math.round(100 * i / posters.length));
+      console.error(table.toString());
+
+      console.error();
+      console.error('(*) How "score" is calculated?');
+      console.error('  The general idea is that DM > mention, and you → user > user → you');
+      console.error('  * A DM sent to you gives 3 points');
+      console.error('  * A DM sent by you gives 5 points');
+      console.error('  * A mention sent to you gives 1 points');
+      console.error('  * A mention sent by you gives 2 points');
+      console.error('  Yes, you could not agree. This is an *information*, use it the way you like');
+      console.error();
+    }
+
+    function smart_guess () {
+      console.error();
       console.error(color.warning.bold('Not implemented yet, sorry :('));
       console.error();
-      console.error('Next version will check who you mention or are mentionned by');
-      console.error('and who sent/received direct messages, to detect your real');
-      console.error('acquaintance in that mess. That should help a lot!');
     }
 
     function quit () {
