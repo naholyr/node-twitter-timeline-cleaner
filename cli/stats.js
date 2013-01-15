@@ -59,9 +59,9 @@ module.exports = function () {
     console.error('  I will now read your timeline and your direct messages, and then be able');
     console.error('  to tell you who you could remove to improve your productivity :)');
     if (cache.enabled) {
-      console.error('  Note: timeline posts will be cached locally');
-      console.error('        for privacy reasons direct messages are not cached');
-      console.error('        ' + color.bold('unless you provided option "--cache-dms"'));
+      console.error('  Note: fetched data will be cached locally');
+      console.error('        for privacy reasons that ' + color.bold('DOES NOT') + ' include texts of messages');
+      console.error('        if you do not want to cache DMs, add option "--no-cache-dms"');
     }
     console.error();
 

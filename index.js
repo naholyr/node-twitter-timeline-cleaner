@@ -26,7 +26,7 @@ module.exports = (new Command)
   // Stats
   .command('stats')
     .description('Show statistics about your timeline')
-    .option('--cache-dms', 'Cache direct messages')
+    .option('--no-cache-dms', 'Cache direct messages')
     .option('--offline', 'Do not connect to Twitter: work from cache data only')
     .action(require('./cli/stats'))
     .parent
