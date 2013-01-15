@@ -82,7 +82,7 @@ module.exports = function () {
         console.error();
         return cb(res);
       }
-      cache.set('friends_ids', res, true);
+      cache.set('friends_ids', res);
       progress.total = res.length;
       progress.tick(0);
       var friends = {};
@@ -113,7 +113,7 @@ module.exports = function () {
             res.forEach(function (user) {
               user_info[user.id_str] = user;
             });
-            cache.set('user_info', user_info, true);
+            cache.set('user_info', user_info);
             done();
           });
         } else {
@@ -151,7 +151,7 @@ module.exports = function () {
         } else {
           // Save and go on
           posts = posts.concat(res);
-          if (cache_key) cache.set(cache_key, posts, true);
+          if (cache_key) cache.set(cache_key, posts);
           progress.tick(res.length);
         }
         // Next step

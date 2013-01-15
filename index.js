@@ -5,7 +5,6 @@ var package = require('./package.json');
 var config = require('./lib/config');
 var cache = require('./lib/cache');
 
-
 module.exports = (new Command)
   .version(package.version)
   .description('Twitter Timeline Cleaner')
