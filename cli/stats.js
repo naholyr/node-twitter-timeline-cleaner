@@ -96,7 +96,7 @@ module.exports = function () {
         console.error();
         return cb(res);
       }
-      cache.set('friends_ids', res);
+      cache.set('friends_ids', res.slice());
       progress.total = res.length;
       progress.tick(0);
       var friends = {};
