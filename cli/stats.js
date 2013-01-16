@@ -34,7 +34,13 @@ module.exports = function () {
       }
     })();
 
-    if (!home_posts || !user_posts || !friends || !mentions) {
+    var enough_data = true;
+    if (!Array.isArray(home_posts) || home_posts.length == 0) enough_data = false;
+    if (!Array.isArray(user_posts)) enough_data = false;
+    if (!Array.isArray(mentions)) enough_data = false;
+    if (!friends || friends.constructor !== Object || Object.keys(friends).length == 0) enough_data = false;
+
+    if (!enough_data) {
       console.error('Not enough data to work offline, please run "stats" at least once');
       process.exit(1);
     }
