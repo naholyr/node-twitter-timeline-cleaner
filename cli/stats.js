@@ -358,12 +358,15 @@ module.exports = function () {
       console.error();
       console.error(color.title('Global statistics') + ':');
       console.error();
-      console.error('  You receive ~ %d messages daily, do you feel overwhelmed?',
-        Math.round((24 * home_posts.length) / (home_timelapse / 3600)));
-      console.error('  You post ~ %d messages daily',
-        Math.round((24 * user_posts.length) / (user_timelapse / 3600)));
-      console.error('  You receive ~ %d mentions daily',
-        Math.round((24 * mentions.length) / (mentions_timelapse / 3600)));
+      console.error(color.success('  Your timeline grows by ~ %d messages daily') + ' (sample ~ %d days), do you feel overwhelmed?',
+        Math.round((24 * home_posts.length) / (home_timelapse / 3600)),
+        Math.round(home_timelapse / (24 * 3600)));
+      console.error(color.success('  You post ~ %d messages daily') + ' (sample ~%d days), do you think you should slow down?',
+        Math.round((24 * user_posts.length) / (user_timelapse / 3600)),
+        Math.round(user_timelapse / (24 * 3600)));
+      console.error('  You\'re mentionned      ~ %d times daily (sample ~%d days)',
+        Math.round((24 * mentions.length) / (mentions_timelapse / 3600)),
+        Math.round(mentions_timelapse / (24 * 3600)));
       console.error('  The 20% top posters in your timeline produce %d%% of total',
         Math.round(100*posters.slice(0, Math.ceil(posters.length/5)).reduce(function (total, p) { return total + p.nb_posts }, 0) / home_posts.length));
       console.error('  Amongst your %d friends, %d%% did not post any message during the last %d hours.',
